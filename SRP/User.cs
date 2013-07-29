@@ -102,7 +102,7 @@ namespace SRP
             // Generate a random 32 byte a
             byte[] byte_a = new byte[32];
             RNGCryptoServiceProvider.Create().GetBytes(byte_a);
-            this.a = new BigInteger(byte_a);
+            this.a = new BigInteger(byte_a).abs();
 
             // Compute A
             byte_A = g.modPow(a, N).getBytes();
@@ -115,7 +115,7 @@ namespace SRP
             }
 
             // Get BigInteger k and store it
-            this.k = new BigInteger(byte_k);
+            this.k = new BigInteger(byte_k).abs();
         }
 
         /// <summary>
@@ -135,8 +135,8 @@ namespace SRP
         /// <returns>M or null</returns>
         public byte[] ProcessChallenge(byte[] byte_s, byte[] byte_B)
         {
-            BigInteger s = new BigInteger(byte_s);
-            BigInteger B = new BigInteger(byte_B);
+            BigInteger s = new BigInteger(byte_s).abs();
+            BigInteger B = new BigInteger(byte_B).abs();
 
             // SRP-6a dictated safety check
             if(B % N == 0)
@@ -164,13 +164,20 @@ namespace SRP
                 byte[] byte_I = encoding.GetBytes(username);
                 byte[] byte_p = encoding.GetBytes(password);
                 byte[] byte_x = Common.GenerateX(byte_s, byte_I, byte_p);
-                BigInteger x = new BigInteger(byte_x);
+                BigInteger x = new BigInteger(byte_x).abs();
 
                 // Compute v
-                BigInteger v = g.modPow(x, N);
+                BigInteger v = g.modPow(x, N).abs();
 
                 // Compute S
-                BigInteger S = (B - k * v).modPow(a + u * x, N).abs();
+                // The remainder is computed here, not the modulo.
+                // This means that, if n is negative, we need to do N - remainder to get the modulo
+                BigInteger S = (B - k * v).modPow(a + u * x, N);
+
+                if (S < 0)
+                {
+                    S = N + S;
+                }
 
                 // Compute K
                 byte_K = h.ComputeHash(S.getBytes());
